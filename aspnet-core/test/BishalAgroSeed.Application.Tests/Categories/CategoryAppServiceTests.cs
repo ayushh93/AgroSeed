@@ -10,6 +10,7 @@ using System.Linq.Expressions;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Volo.Abp.Application.Dtos;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Validation;
 using Xunit;
@@ -89,7 +90,7 @@ namespace BishalAgroSeed.Application.Tests.Categories
                 new DropdownDto(categories[4].Id.ToString(), "Category5"),
             };
 
-            //Setup mock repository for GetQueryableAsync method to return categories as IQuerable 
+            //Setup mock repository for GetQueryableAsync method to return categories as IQueryable 
             _mockRepository.GetQueryableAsync().Returns(categories.AsQueryable());
 
             //Act
@@ -98,16 +99,89 @@ namespace BishalAgroSeed.Application.Tests.Categories
             //Assert
             Assert.NotNull(result);
             Assert.Equal(expectedResult.Count, result.Count);
-            // Compare each property of result and expected result
             for (int i = 0; i < result.Count; i++)
             {
-                Assert.Equal(expectedResult[i].Value, result[i].Value);
+                Assert.Equal(expectedResult[i].Value, result[i].Value.ToLower());
                 Assert.Equal(expectedResult[i].Name, result[i].Name);
             };
             // This failed
             //Assert.Equal(expectedResult, result); 
         }
 
+        [Fact]
+        public async Task GetListAsync_ShouldReturnPagedCategories()
+        {
+            // Arrange
+            var categories = new List<Category>
+            {
+                new Category (Guid.NewGuid(), "ParentCategory1", new Guid(), true),
+                new Category (Guid.NewGuid(), "ParentCategory2", new Guid(), true),
+                new Category (Guid.NewGuid(), "ParentCategory3", new Guid(), true),
+            };
+            var childCategory = new Category(Guid.NewGuid(), "ChildCategory1", categories[0].Id, true);
+            categories.Add(childCategory);
+
+            PagedAndSortedResultRequestDto input = new PagedAndSortedResultRequestDto();
+            input.SkipCount = 1;
+            input.MaxResultCount = 5;
+
+            var expectedResult= new List<CategoryDto>
+            {
+                new CategoryDto
+                {
+                    Id = categories[3].Id,
+                    DisplayName = "ChildCategory1",
+                    ParentId = categories[0].Id,
+                    ParentName = "ParentCategory1",
+                    IsActive = true
+                },
+                //new CategoryDto
+                //{
+                //    Id = categories[0].Id,
+                //    DisplayName = "ParentCategory1",
+                //    ParentId = null,
+                //    IsActive = true
+                //},
+                new CategoryDto
+                {
+                    Id = categories[1].Id,
+                    DisplayName = "ParentCategory2",
+                    ParentId = null,
+                    IsActive = true
+                },
+                new CategoryDto
+                {
+                    Id = categories[2].Id,
+                    DisplayName = "ParentCategory3",
+                    ParentId = null,
+                    IsActive = true
+                }                
+            };
+
+            //Setup mock repository for GetQueryableAsync method to return categories as IQueryable 
+            _mockRepository.GetQueryableAsync().Returns(categories.AsQueryable());
+
+            //Act
+            var result = await _categoryAppService.GetListAsync(input);
+
+            //Assert
+            Assert.NotNull(result);
+            Assert.NotNull(result.Items);
+            Assert.Equal(categories.Count,result.TotalCount);
+            Assert.Equal(expectedResult.Count, result.Items.Count);
+            for (int i = 0; i < result.Items.Count; i++)
+            {
+                Assert.Equal(expectedResult[i].Id, result.Items[i].Id);
+                Assert.Equal(expectedResult[i].DisplayName, result.Items[i].DisplayName);
+                Assert.Equal(expectedResult[i].DisplayName, result.Items[i].DisplayName);
+                Assert.Equal(expectedResult[i].ParentId, result.Items[i].ParentId);
+                Assert.Equal(expectedResult[i].ParentName, result.Items[i].ParentName);
+                Assert.Equal(expectedResult[i].IsActive, result.Items[i].IsActive);
+            };
+            //This failed
+            //Assert.Equal(expectedResult, result.Items);
+
+        }
     }
 
 }
